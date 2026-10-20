@@ -1,5 +1,10 @@
 # MediCare AI
 
+To open the complete app locally, start Docker Desktop and run
+`docker compose -f compose.local.yaml up --build -d --wait`, then open
+`http://localhost:3000` on that computer. No hosting account is needed.
+See [the local demo guide](docs/LOCAL-DEMO.md) for clone and startup instructions.
+
 For a full interactive demo on Render, see [the Render deployment guide](docs/RENDER.md)
 and the root [Blueprint](render.yaml). It includes the frontend, API, OCR worker,
 PostgreSQL, Redis, and persistent encrypted storage. Render provisioning and its

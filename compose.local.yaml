@@ -1,0 +1,61 @@
+name: medicare-ai-local
+services:
+  app:
+    image: medicare-ai-local:latest
+    build:
+      context: .
+      dockerfile: infrastructure/docker/render-demo.Dockerfile
+    command: ["/app/services/api/.venv/bin/python", "/app/scripts/local_start.py"]
+    ports:
+      - "127.0.0.1:${MEDICARE_LOCAL_PORT:-3000}:10000"
+    environment:
+      APP_MODE: development
+      AUTH_PROVIDER: local
+      STORAGE_PROVIDER: local
+      DATABASE_URL: postgresql+psycopg://medicare:local-development-only@postgres:5432/medicare
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_DATA_DIR: /var/data/medicare
+      ALLOWED_ORIGINS: http://localhost:${MEDICARE_LOCAL_PORT:-3000},http://127.0.0.1:${MEDICARE_LOCAL_PORT:-3000}
+      PORT: "10000"
+    volumes:
+      - private_data:/var/data
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/app/services/api/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10000/api/v1/health', timeout=4)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 60s
+      retries: 12
+    stop_grace_period: 30s
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: medicare
+      POSTGRES_DB: medicare
+      POSTGRES_PASSWORD: local-development-only
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicare -d medicare"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+volumes:
+  private_data:
+  postgres_data:
+  redis_data:

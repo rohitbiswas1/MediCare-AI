@@ -32,7 +32,7 @@ COPY services/api/ ./
 COPY --from=web /app/apps/web/.next/standalone /app/web
 COPY --from=web /app/apps/web/.next/static /app/web/apps/web/.next/static
 COPY apps/web/public /app/web/apps/web/public
-COPY scripts/render_start.py scripts/generate_demo_samples.py /app/scripts/
+COPY scripts/render_start.py scripts/local_start.py scripts/generate_demo_samples.py /app/scripts/
 RUN .venv/bin/python /app/scripts/generate_demo_samples.py /app/web/apps/web/public/demo && \
     mkdir -p /var/data/medicare && chown -R medicare:medicare /app /var/data
 USER medicare

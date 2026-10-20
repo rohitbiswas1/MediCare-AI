@@ -19,6 +19,9 @@ Validated in this cloud workspace on 20 October 2026. All application fixtures w
 | Render demo image | Optimized standalone frontend + API + worker + scheduler built successfully |
 | Render image integration | Passed `scripts/render_smoke.py` over locally verified HTTPS: generated samples, secure cookies, actual OCR, isolated non-superuser PostgreSQL, restart persistence, owner isolation, deletion and worker-failure shutdown |
 | Render Blueprint | YAML parsing, referenced resources and Docker paths checked locally; Render server validation/provisioning awaits account access |
+| Local Docker launch | `compose.local.yaml` built and started with all three containers healthy; frontend, API, OCR worker and scheduler run together behind a loopback-only port |
+| Local Docker workflows | All 6 desktop/mobile browser tests and the live PDF/image OCR smoke passed against the packaged app; restart preserved the session, account, extracted results and encrypted document |
+| Shared launcher regression | Render image HTTPS, secure cookies, OCR, restart persistence and worker-failure shutdown checks passed after sharing supervision with the local launcher |
 
 ## Integration scope
 
@@ -29,6 +32,9 @@ There are no clinically validated ECG/X-ray weights, authorized real research da
 The ClamAV integration and production fail-closed checks are implemented; live antivirus signatures/scanning were not provisioned in this development run. Uploads here use structural checks. No real patient records should be uploaded.
 
 GitHub Actions configuration is included; remote CI status has not been verified.
+The local Docker stack was tested on Linux in Codex cloud; Docker Desktop on
+macOS/Windows has not been independently tested. See `docs/LOCAL-DEMO.md` for the
+local launch command and persistent volume behavior.
 No Render deployment or cloud environment publication is claimed by these local
 tests. A saved environment draft is separate from publication and from validation
 in a fresh task. See `docs/RENDER.md` for the deployment and paid resource choices.

@@ -40,8 +40,8 @@ def configuration():
     return env
 
 
-def main():
-    env = configuration()
+def run(env):
+    """Supervise the bundle using environment validated by its selected launcher."""
     children = []
     stopping = False
 
@@ -114,6 +114,10 @@ def main():
             except subprocess.TimeoutExpired:
                 os.killpg(child.pid, signal.SIGKILL)
                 child.wait()
+
+
+def main():
+    return run(configuration())
 
 
 if __name__ == "__main__":
