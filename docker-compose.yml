@@ -1,0 +1,79 @@
+name: medicare-ai
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: medicare
+      POSTGRES_DB: medicare
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicare"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://medicare:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/medicare
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_DATA_DIR: /data
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["private_data:/data"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["uv", "run", "--frozen", "--no-dev", "celery", "-A", "app.jobs:celery", "worker", "--loglevel=WARNING", "--concurrency=2"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://medicare:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/medicare
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_DATA_DIR: /data
+    volumes: ["private_data:/data"]
+    depends_on:
+      api: {condition: service_started}
+  beat:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["uv", "run", "--frozen", "--no-dev", "celery", "-A", "app.jobs:celery", "beat", "--loglevel=WARNING", "--schedule", "/data/beat-schedule"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://medicare:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/medicare
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_DATA_DIR: /data
+    volumes: ["private_data:/data"]
+    healthcheck: {disable: true}
+    depends_on:
+      redis: {condition: service_healthy}
+  clamav:
+    profiles: ["antivirus"]
+    image: clamav/clamav:stable
+    ports: ["127.0.0.1:3310:3310"]
+    volumes: ["clamav_data:/var/lib/clamav"]
+volumes:
+  postgres_data:
+  redis_data:
+  private_data:
+  clamav_data:

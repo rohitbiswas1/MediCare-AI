@@ -1,0 +1,82 @@
+name: validate
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: medicare
+          POSTGRES_PASSWORD: local-development-only
+          POSTGRES_DB: medicare
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U medicare" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install tools and locked dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+          npm ci
+          uv sync --frozen --project services/api
+          npx playwright install --with-deps chromium
+      - name: Static checks and API tests
+        run: |
+          npm run lint
+          npm run typecheck
+          uv run --project services/api ruff check services/api/app services/api/tests
+          (cd services/api && uv run --frozen python -m pytest -q)
+      - name: Build and start application
+        run: |
+          mkdir -p .local
+          (cd services/api && uv run --frozen alembic upgrade head)
+          npm run build
+          (cd services/api && uv run --frozen uvicorn app.main:app --no-access-log > ../../.local/api.log 2>&1 &)
+          (cd services/api && uv run --frozen celery -A app.jobs:celery worker --loglevel=WARNING --concurrency=2 > ../../.local/worker.log 2>&1 &)
+          npm run start --workspace apps/web > .local/web.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/v1/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/api/v1/health
+      - name: Real OCR, PostgreSQL isolation, and browser workflows
+        run: |
+          services/api/.venv/bin/python scripts/smoke.py
+          services/api/.venv/bin/python scripts/check_rls.py
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: synthetic-test-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --project ml
+      - run: uv run --frozen --project ml python -m pytest tests/test_ml.py -q

@@ -1,0 +1,4 @@
+**/.next/**
+**/node_modules/**
+**/.venv/**
+packages/shared-types/index.ts
